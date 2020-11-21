@@ -1,5 +1,5 @@
-import * as THREE from './libs/three/three.module.js';
-import { BufferGeometryUtils } from './libs/three/jsm/BufferGeometryUtils.js';
+import * as THREE from '../libs/three/three.module.js';
+import { BufferGeometryUtils } from '../libs/three/jsm/BufferGeometryUtils.js';
 
 const Lshape = {
   color: 0x00a9fe,
@@ -53,7 +53,6 @@ class LBlock {
       linewidth: 2,
       color: 0x86f9e7,
     });
-
 
     let i = 0;
     for (let iY = 0; iY < this.grid[1].length; iY++) {
@@ -124,13 +123,13 @@ class LBlock {
     return this.lPivot;
   }
 
-  addCubeToSpace() {
+  addToSpace() {
     const cubes = [];
     const cubeGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
     const cubeMaterial = new THREE.MeshStandardMaterial({
       color: this.color,
       roughness: 0.7,
-      metalness: 0.0
+      metalness: 0.0,
     });
 
     let i = 0;
@@ -213,6 +212,7 @@ class LBlock {
     this.lShapePart2.updateWorldMatrix;
 
     this.lShape.add(this.lShapePart1, this.lShapePart2);
+    this.lShape.name = "lshape";
     this.lShape.updateWorldMatrix();
     this.lPivot.add(this.lShape);
     return this.lPivot;
@@ -248,9 +248,9 @@ class LBlock {
 
     this.lShape.add(this.lShapePart1, this.lShapePart2);
     this.lShape.updateWorldMatrix();
+    this.lShape.name = 'lshape';
     this.lPivot.add(this.lShape);
     return this.lPivot;
   }
 }
 export { LBlock };
-

@@ -1,7 +1,6 @@
 import * as THREE from './libs/three/three.module.js';
 
 import { OrbitControls } from './libs/three/jsm/OrbitControls.js';
-import { BoxLineGeometry } from './libs/three/jsm/BoxLineGeometry.js';
 import { XRControllerModelFactory } from './libs/three/jsm/XRControllerModelFactory.js';
 
 import { Stats } from './libs/stats.module.js';
@@ -9,7 +8,15 @@ import { Stats } from './libs/stats.module.js';
 //import conponents
 
 import { VRButton } from './VRButton.js';
-import { LBlock } from './lShape.js';
+import { Planes } from './planes.js';
+import { LBlock } from './shapes/l-shape.js';
+import { TBlock } from './shapes/t-shape.js';
+import { ZBlock } from './shapes/z-shape.js';
+import { Inputs } from './inputs.js';
+import { Levels } from './level.js';
+
+
+// import { LBlock, TBlock, ZBlock } from './shapes/'
 
 class App {
   constructor() {
@@ -31,17 +38,19 @@ class App {
 
     //Scene setting: default background is white 0xfe53bb
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0xffffff);
+    this.scene.background = new THREE.Color(0xfffff0);
     //Only have light can see the color of objects
 
     //add environment light (can't have shadows):
     //hemispherelight(Sky color, ground color, intensity)
-    const environmentLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 0.3);
+    const environmentLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 1);
     this.scene.add(environmentLight);
+    //0xffffbb, 0x080820, 1
+    //0xffffff, 0xbbbbff, 0.3
 
     //add direct light from a position.
     const light = new THREE.DirectionalLight();
-    light.position.set(0.2, 1, 0);
+    light.position.set(0, 20, 0);
     this.scene.add(light);
 
     //Renderer setting:
@@ -50,26 +59,7 @@ class App {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputEncoding = THREE.sRGBEncoding;
-
     container.appendChild(this.renderer.domElement);
-
-    //get mouse
-    this.mouse = new THREE.Vector2();
-    document.addEventListener(
-      'mousemove',
-      this.onDocumentMouseMove.bind(this),
-      false
-    );
-    document.addEventListener(
-      'mousedown',
-      this.onDocumentMouseDown.bind(this),
-      false
-    );
-    document.addEventListener(
-      'keydown',
-      this.roatetkeyPressed.bind(this),
-      false
-    );
 
     //drag page control
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -84,8 +74,40 @@ class App {
 
     //visuialize controllers
     this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
     this.workingMatrix = new THREE.Matrix4();
     this.workingVector = new THREE.Vector3();
+
+    //Init planes
+    this.planeXYG = new Planes().addXY();
+    this.planeXY = this.planeXYG.children[0];
+    this.planeZYG = new Planes().addZY();
+    this.planeZY = this.planeZYG.children[0];
+    this.planeXZG = new Planes().addXZ();
+    this.planeXZ = this.planeXZG.children[0];
+    this.levelShdaowsXY = [];
+    this.levelShdaowsZY = [];
+    //shadow center points
+
+    this.receivedShadowsXY = [];
+    this.receivedShadowsZY = [];
+
+
+    //raycaster array
+    this.allObjects = [];
+    this.allObjects.push(this.planeXZG.children[0]);
+
+    // Init events
+    this._onMouseMoves = [];
+    this._onMouseDowns = [];
+    this._onKeyDowns = [];
+    this.BlocksControls = new Inputs(this);
+    this._addEventListeners();
+
+    this.LSelected = false;
+    this.TSelected = false;
+    this.ZSelected = false;
+    this.BLOCKS = [];
 
     this.initScene();
     this.setupXR();
@@ -95,441 +117,414 @@ class App {
   }
 
   initScene() {
+
     this.radius = 0.08;
     //XY plane
-    const gridHelperXY = new THREE.GridHelper(6, 6);
-    gridHelperXY.rotateX(Math.PI / 2);
-    gridHelperXY.position.z = -4;
-    gridHelperXY.position.y = 3;
-    this.scene.add(gridHelperXY);
+    this.ShadowXY1 = new Levels().addShadowXY(this);
+    //console.log(this.ShadowXY1.children[1].getWorldPosition());
 
-    const planeGeomXY = new THREE.PlaneBufferGeometry(6, 6);
-    this.planeXY = new THREE.Mesh(
-      planeGeomXY,
-      new THREE.MeshBasicMaterial({
-        color: 0x00ffff,
-        opacity: 0.5,
-        transparent: true,
-      })
-    );
-    this.planeXY.position.set(0, 3, -4);
-    this.scene.add(this.planeXY);
-
+    this.planeXYG.add(this.ShadowXY1);
+    this.scene.add(this.planeXYG);
     //ZY plane
-    const gridHelperZY = new THREE.GridHelper(6, 6);
-    gridHelperZY.rotateZ(-Math.PI / 2);
-    gridHelperZY.position.x = -4;
-    gridHelperZY.position.y = 3;
-    this.scene.add(gridHelperZY);
+     this.ShadowZY1 = new Levels().addShadowZY(this);
+     //console.log(this.ShadowZY1.children[1].getWorldPosition());
 
-    const planeGeomZY = new THREE.PlaneBufferGeometry(6, 6);
-    this.planeZY = new THREE.Mesh(
-      planeGeomZY,
-      new THREE.MeshBasicMaterial({
-        color: 0x00ffff,
-        opacity: 0.5,
-        transparent: true,
-      })
-    );
-    this.planeZY.rotateY(Math.PI / 2);
-    this.planeZY.position.x = -4;
-    this.planeZY.position.y = 3;
-    this.scene.add(this.planeZY);
-
+     this.planeZYG.add(this.ShadowZY1);
+    this.scene.add(this.planeZYG);
     //XZ plane
-    const gridHelperXZ = new THREE.GridHelper(6, 6, 0xffffff, 0xffffff);
-    this.scene.add(gridHelperXZ);
-    const planeGeomXZ = new THREE.PlaneBufferGeometry(6, 6);
-    planeGeomXZ.rotateX(-Math.PI / 2);
-    planeGeomXZ.normalizeNormals();
+    this.scene.add(this.planeXZG);
 
-    this.planeXZ = new THREE.Mesh(
-      planeGeomXZ,
-      new THREE.MeshBasicMaterial({
-        color: 0xff0080,
-        transparent: true,
-        opacity: 0.5,
-      })
+    this.LBLOCK = new LBlock().addToSpace();
+    this.LBLOCK.position.set(0, 3.4, 0);
+    this.LBLOCK.rotateY(Math.PI / 2);
+    this.LBLOCK.scale.set(0.5, 0.5, 0.5);
+
+    this.TBLOCK = new TBlock().addToSpace();
+    this.TBLOCK.rotateX(Math.PI / 2);
+    this.TBLOCK.position.set(0, -4, 0);
+    this.TBLOCK.scale.set(0.5, 0.5, 0.5);
+
+    this.ZBLOCK = new ZBlock().addToSpace();
+    this.ZBLOCK.position.set(0, 3.6, 0);
+    this.ZBLOCK.rotateZ(Math.PI / 2);
+    this.ZBLOCK.scale.set(0.5, 0.5, 0.5);
+
+    const pointLight = new THREE.PointLight(0xffffff, 3, 800);
+    this.powerLight = new THREE.Mesh(
+      new THREE.SphereBufferGeometry(0.1, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffff })
     );
-    this.planeXZPivot = new THREE.Group();
-    this.planeXZPivot.add(this.planeXZ, gridHelperXZ);
+    this.powerLight.add(pointLight);
+    this.powerLight.position.y = 3;
 
-    this.LBlockS = new LBlock().addSkeletonToSpace();
-    this.currentRotation = new THREE.Quaternion();
-    this.LBlockS.getWorldQuaternion(this.currentRotation);
-    //console.log(this.currentRotation);
+    const Cygeometry = new THREE.CylinderBufferGeometry(0.1, 0.1, 7, 32);
+    const materialX = new THREE.MeshPhongMaterial({
+      color: 0x304281,
+      specular: 0x111111,
+      reflectivity: 1,
+      shininess: 30,
+    });
+    const materialZ = new THREE.MeshPhongMaterial({
+      color: 0x72d0b2,
+      specular: 0x111111,
+      reflectivity: 1,
+      shininess: 30,
+    });
+    const materialY = new THREE.MeshPhongMaterial({
+      color: 0x304281,
+      specular: 0x111111,
+      reflectivity: 1,
+      shininess: 30,
+      opacity: 1,
+      transparent: true,
+    });
 
-    this.removedXYPiece = [];
-    this.LShadowXY = new LBlock().addShadowXY();
-    this.LShadowXY.position.set(0, 3, -4);
-    this.planeXY.attach(this.LShadowXY);
+    const CygeometryY = new THREE.CylinderBufferGeometry(
+      0.1,
+      0.1,
+      6.5,
+      32,
+      4,
+      true
+    );
 
-    this.removedZYPiece = [];
-    this.LShadowZY = new LBlock().addShadowZY();
-    this.removedZYPiece.push(this.LShadowZY.children[0].children[1]);
-    this.LShadowZY.children[0].remove(this.LShadowZY.children[0].children[1]);
-    this.LShadowZY.position.set(-4, 3, 0);
-    this.planeZY.attach(this.LShadowZY);
+    CygeometryY.computeBoundingBox();
 
-    //raycaster array
-    this.allObjects = [];
+    const centerGeometry = new THREE.SphereBufferGeometry(0.2, 32, 32);
+    const centerMaterial = new THREE.MeshPhongMaterial({
+      color: 0x72d0b2,
+      specular: 0x111111,
+      reflectivity: 0.8,
+      shininess: 30,
+      opacity: 0.8,
+      transparent: true,
+    });
+    this.alixX = new THREE.Mesh(Cygeometry, materialX);
+    this.alixX.rotateZ(-Math.PI / 2);
+    this.alixX.position.set(3.5, 0, 0);
+    this.alixX.add(this.ZBLOCK);
+    this.alixY = new THREE.Mesh(CygeometryY, materialY);
+    this.alixY.position.set(0, 3.25, 0);
+    this.alixY.add(this.LBLOCK);
+    this.alixZ = new THREE.Mesh(Cygeometry, materialZ);
+    this.alixZ.rotateX(-Math.PI / 2);
+    this.alixZ.position.set(0, 0, 3.5);
+    this.alixZ.add(this.TBLOCK);
+    this.center = new THREE.Mesh(centerGeometry, centerMaterial);
+    this.center.add(this.alixX, this.alixY, this.alixZ);
+    //this.center.add(this.powerLight);
 
-    this.scene.add(this.planeXZPivot);
-    this.scene.add(this.LBlockS);
-    this.allObjects.push(this.planeXZPivot.children[0]);
+    this.coorGroup = new THREE.Object3D();
+    this.coorGroup.add(this.center);
+    this.coorGroup.position.set(-3.5, -0.1, -3.5);
+    this.scene.add(this.coorGroup);
+
+    this.BLOCKS.push(this.LBLOCK, this.TBLOCK, this.ZBLOCK);
+  }
+
+  animateLforward() {
+    const defultRL = this.LBLOCK.rotation;
+    const tweenRL1 = new TWEEN.Tween(defultRL)
+      .to({ y: '+' + Math.PI / 6 }, 700)
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+    const tweenSL1 = new TWEEN.Tween(this.LBLOCK.scale)
+      .to(
+        this.LBLOCK.scale.set(
+          this.LBLOCK.scale.x + 0.1,
+          this.LBLOCK.scale.y + 0.1,
+          this.LBLOCK.scale.z + 0.1
+        ),
+        700
+      )
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+
+    const currentEmis = this.LBLOCK.children[0].children[0].material.emissive;
+
+    const tweenColorL1 = new TWEEN.Tween(currentEmis)
+      .to({ r: '+' + 0, g: '+' + 156, b: '+' + 224 }, 40000)
+      .onUpdate()
+      .start();
+  }
+  animateLbackward() {
+    const defultRL = this.LBLOCK.rotation;
+    const tweenL2 = new TWEEN.Tween(this.LBLOCK.rotation)
+      .to({ y: '-' + Math.PI / 6 }, 700)
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate()
+      .start();
+    const tweenSL2 = new TWEEN.Tween(this.LBLOCK.scale)
+      .to(
+        this.LBLOCK.scale.set(
+          this.LBLOCK.scale.x - 0.1,
+          this.LBLOCK.scale.y - 0.1,
+          this.LBLOCK.scale.z - 0.1
+        ),
+        500
+      )
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate()
+      .start();
+    const currentEmis = this.LBLOCK.children[0].children[0].material;
+    //console.log(this.LBLOCK.children[0].children[0].material);
+    const defaultEmis = currentEmis.emissive.set(0x000000);
+  }
+
+  animateTforward() {
+    const defultRT = this.TBLOCK.rotation;
+    const tweenRT1 = new TWEEN.Tween(defultRT)
+      .to({ z: '+' + Math.PI / 7 }, 700)
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+    const tweenST1 = new TWEEN.Tween(this.TBLOCK.scale)
+      .to(
+        this.TBLOCK.scale.set(
+          this.TBLOCK.scale.x + 0.1,
+          this.TBLOCK.scale.y + 0.1,
+          this.TBLOCK.scale.z + 0.1
+        ),
+        700
+      )
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+
+    this.TBLOCK.children[0].children[0].material.emissive.setHex(0xfc6e22);
+
+
+
+  }
+  animateTbackward() {
+    const defultRT = this.TBLOCK.rotation;
+    const tweenRT2 = new TWEEN.Tween(defultRT)
+      .to({ z: '-' + Math.PI / 7 }, 700)
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate()
+      .start();
+
+    const tweenST2 = new TWEEN.Tween(this.TBLOCK.scale)
+      .to(
+        this.TBLOCK.scale.set(
+          this.TBLOCK.scale.x - 0.1,
+          this.TBLOCK.scale.y - 0.1,
+          this.TBLOCK.scale.z - 0.1
+        ),
+        700
+      )
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+    this.TBLOCK.children[0].children[0].material.emissive.setHex(0x000000);
+  }
+  animateZforward() {
+    const defultRZ = this.ZBLOCK.rotation;
+    const tweenRZ1 = new TWEEN.Tween(defultRZ)
+      .to({ y: '-' + Math.PI / 7 }, 700)
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+    const tweenST1 = new TWEEN.Tween(this.ZBLOCK.scale)
+      .to(
+        this.ZBLOCK.scale.set(
+          this.ZBLOCK.scale.x + 0.1,
+          this.ZBLOCK.scale.y + 0.1,
+          this.ZBLOCK.scale.z + 0.1
+        ),
+        700
+      )
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+
+    const currentEmis1 = this.ZBLOCK.children[0].children[0].material.emissive;
+    //0xb537f2;
+    //r: '+' + 181, g: '+' + 55, b: '+' + 242
+    const tweenColorZ1 = new TWEEN.Tween(currentEmis1)
+      .to({ r: '+' + 10, g: '+' + 55, b: '+' + 0 }, 40000)
+      .onUpdate()
+      .start();
+  }
+  animateZbackward() {
+    const defultRZ = this.ZBLOCK.rotation;
+    const tweenRZ2 = new TWEEN.Tween(defultRZ)
+      .to({ y: '+' + Math.PI / 7 }, 700)
+      .easing(TWEEN.Easing.Quadratic.InOut)
+      .onUpdate()
+      .start();
+
+    const tweenSZ2 = new TWEEN.Tween(this.ZBLOCK.scale)
+      .to(
+        this.ZBLOCK.scale.set(
+          this.ZBLOCK.scale.x - 0.1,
+          this.ZBLOCK.scale.y - 0.1,
+          this.ZBLOCK.scale.z - 0.1
+        ),
+        700
+      )
+      .easing(TWEEN.Easing.Elastic.InOut)
+      .onUpdate()
+      .start();
+
+    const currentEmis = this.ZBLOCK.children[0].children[0].material.emissive;
+    const defaultEmis = currentEmis.setHex(0x000000);
+    console.log(currentEmis);
+    // const tweenColorZ2 = new TWEEN.Tween(currentEmis)
+    //   .to(defaultEmis, 700)
+    //   .onUpdate()
+    //   .start();
+  }
+
+  initBlocks() {
+    const blockElements = app.raycaster.intersectObjects(this.BLOCKS, true);
+    if (blockElements.length > 0) {
+      let selectBlock = blockElements[0];
+      if (selectBlock.object.parent == this.BLOCKS[0].children[0]) {
+        if (!this.LSelected) {
+          this.LSelected = !this.LSelected;
+          // reset all
+          this.TSelected = false;
+          this.scene.remove(this.TBlockS);
+          this.planeXY.remove(this.TShadowXY);
+          this.planeZY.remove(this.TShadowZY);
+          if (this.TBLOCK.scale.x !== 0.5) {
+            this.animateTbackward();
+          }
+          this.ZSelected = false;
+          this.scene.remove(this.ZBlockS);
+          this.planeXY.remove(this.ZShadowXY);
+          this.planeZY.remove(this.ZShadowZY);
+          if (this.ZBLOCK.scale.x !== 0.5) {
+            this.animateZbackward();
+          }
+          //new stuff
+          this.animateLforward();
+          this.LBlockS = new LBlock().addSkeletonToSpace();
+          this.LcurrentRotation = new THREE.Quaternion();
+          this.LBlockS.getWorldQuaternion(this.LcurrentRotation);
+          this.scene.add(this.LBlockS);
+          this.removedXYPieceL = [];
+          this.LShadowXY = new LBlock().addShadowXY();
+          this.LShadowXY.position.set(0, 3, -4);
+          this.planeXY.attach(this.LShadowXY);
+          this.removedZYPieceL = [];
+          this.LShadowZY = new LBlock().addShadowZY();
+          this.removedZYPieceL.push(this.LShadowZY.children[0].children[1]);
+          this.LShadowZY.children[0].remove(
+            this.LShadowZY.children[0].children[1]
+          );
+          this.LShadowZY.position.set(-4, 3, 0);
+
+          this.planeZY.attach(this.LShadowZY);
+        } else {
+          //reset
+          this.LSelected = !this.LSelected;
+          this.scene.remove(this.LBlockS);
+          this.planeXY.remove(this.LShadowXY);
+          this.planeZY.remove(this.LShadowZY);
+          this.animateLbackward();
+        }
+      } else if (selectBlock.object.parent == this.BLOCKS[1].children[0]) {
+        if (!this.TSelected) {
+          this.TSelected = !this.TSelected;
+          //reset all
+          this.LSelected = false;
+          this.scene.remove(this.LBlockS);
+          this.planeXY.remove(this.LShadowXY);
+          this.planeZY.remove(this.LShadowZY);
+          if (this.LBLOCK.scale.x !== 0.5) {
+            this.animateLbackward();
+          }
+          this.ZSelected = false;
+          this.scene.remove(this.ZBlockS);
+          this.planeXY.remove(this.ZShadowXY);
+          this.planeZY.remove(this.ZShadowZY);
+          if (this.ZBLOCK.scale.x !== 0.5) {
+            this.animateZbackward();
+          }
+          // new stuff
+          this.animateTforward();
+          this.TBlockS = new TBlock().addSkeletonToSpace();
+          this.TcurrentRotation = new THREE.Quaternion();
+          this.TcurrentRotation1 = new THREE.Quaternion();
+          this.TBlockS.getWorldQuaternion(this.TcurrentRotation);
+          this.scene.add(this.TBlockS);
+          this.TShadowXY = new TBlock().addShadowXY();
+          this.TShadowXY.position.set(0, 0, -4);
+          this.planeXY.attach(this.TShadowXY);
+          this.TShadowZY = new TBlock().addShadowZY();
+          this.removedZYPieceT = [];
+          this.TShadowZY.position.set(-4, 3, 0);
+          this.planeZY.attach(this.TShadowZY);
+        } else {
+          //reset
+          this.TSelected = !this.TSelected;
+          this.scene.remove(this.TBlockS);
+          this.planeXY.remove(this.TShadowXY);
+          this.planeZY.remove(this.TShadowZY);
+          this.animateTbackward();
+        }
+      } else if (selectBlock.object.parent == this.BLOCKS[2].children[0]) {
+        if (!this.ZSelected) {
+          this.ZSelected = !this.ZSelected;
+          //reset all
+          this.LSelected = false;
+          this.scene.remove(this.LBlockS);
+          this.planeXY.remove(this.LShadowXY);
+          this.planeZY.remove(this.LShadowZY);
+          if (this.LBLOCK.scale.x !== 0.5) {
+            this.animateLbackward();
+          }
+          this.TSelected = false;
+          this.scene.remove(this.TBlockS);
+          this.planeXY.remove(this.TShadowXY);
+          this.planeZY.remove(this.TShadowZY);
+          if (this.TBLOCK.scale.x !== 0.5) {
+            this.animateTbackward();
+          }
+          //new staff
+          this.animateZforward();
+          this.ZBlockS = new ZBlock().addSkeletonToSpace();
+          this.ZcurrentRotation = new THREE.Quaternion();
+          this.ZBlockS.getWorldQuaternion(this.ZcurrentRotation);
+          this.scene.add(this.ZBlockS);
+          this.ZShadowXY = new ZBlock().addShadowXY();
+          this.ZShadowXY.position.set(0, 0, -4);
+          this.removedXYPieceZ = [];
+          this.planeXY.attach(this.ZShadowXY);
+          this.ZShadowZY = new ZBlock().addShadowZY();
+          this.ZShadowZY.position.set(-4, 0, 0);
+          this.ZcurrentRotation1 = new THREE.Quaternion();
+          this.planeZY.attach(this.ZShadowZY);
+        } else {
+          //reset
+          this.ZSelected = !this.ZSelected;
+          this.scene.remove(this.ZBlockS);
+          this.planeXY.remove(this.ZShadowXY);
+          this.planeZY.remove(this.ZShadowZY);
+          this.animateZbackward();
+        }
+      } else {
+        return;
+      }
+    }
+  }
+
+  onMouseMove(fn) {
+    this._onMouseMoves.push(fn);
+  }
+  onMouseDown(fn) {
+    this._onMouseDowns.push(fn);
+  }
+  onKeyDown(fn) {
+    this._onKeyDowns.push(fn);
   }
 
   //using XR API in VRButton and call controllers
   //from building function
-
-  checkCollision(currentBlock, object2) {
-    let collision = true;
-    for (let Ci = 0; Ci < 2; Ci++) {
-      let box1 = new THREE.Box3()
-        .setFromObject(currentBlock.children[Ci])
-        .expandByScalar(-0.9);
-      for (let Pi = 0; Pi < 2; Pi++) {
-        let box2 = new THREE.Box3().setFromObject(object2.children[Pi]);
-        if (box1.intersectsBox(box2)) {
-          return collision;
-        }
-      }
-    }
-    return !collision;
-  }
-
-  checkShadow(shadowXY, shadowZY) {
-    const wrongColor = 0xff0000;
-
-    let pointXY1M = new THREE.Vector3();
-    let pointXY2M = new THREE.Vector3();
-    let pointZY1M = new THREE.Vector3();
-    let pointZY2M = new THREE.Vector3();
-
-    const pointCurent1 = new THREE.Vector3();
-    const pointCurent2 = new THREE.Vector3();
-
-    this.LBlockS.children[0].children[0].getWorldPosition(pointCurent1);
-    this.LBlockS.children[0].children[1].getWorldPosition(pointCurent2);
-
-    //XY plane shadow trasnform
-    pointXY1M.x = pointCurent1.x.toFixed(1);
-    pointXY1M.y = pointCurent1.y;
-    pointXY1M.z = 0;
-    pointXY2M.x = pointCurent2.x.toFixed(1);
-    pointXY2M.y = pointCurent2.y;
-    pointXY2M.z = 0;
-
-    if (pointXY1M.x !== pointXY2M.x) {
-      if (this.removedXYPiece.length > 0) {
-        pointXY2M.z = pointXY2M.z - 4;
-        this.removedXYPiece[0].position.copy(pointXY2M);
-        shadowXY.children[0].attach(this.removedXYPiece[0]);
-        this.removedXYPiece.length = 0;
-      }
-    } else {
-      if (this.removedXYPiece.length === 0) {
-        this.removedXYPiece.push(shadowXY.children[0].children[1]);
-        shadowXY.children[0].remove(shadowXY.children[0].children[1]);
-      }
-    }
-    //ZY plane shadow trasnform
-    pointZY1M.x = -pointCurent1.z.toFixed(1);
-    pointZY1M.y = pointCurent1.y;
-    pointZY1M.z = 0;
-    pointZY2M.x = -pointCurent2.z.toFixed(1);
-    pointZY2M.y = pointCurent2.y;
-    pointZY2M.z = 0;
-
-    if (pointZY1M.x !== pointZY2M.x) {
-      if (this.removedZYPiece.length > 0) {
-        pointZY2M.x = -4;
-        pointZY2M.z = pointCurent2.z;
-        this.removedZYPiece[0].position.copy(pointZY2M);
-        shadowZY.children[0].attach(this.removedZYPiece[0]);
-        this.removedZYPiece.length = 0;
-      }
-    } else {
-      if (this.removedZYPiece.length === 0) {
-        this.removedZYPiece.push(shadowZY.children[0].children[1]);
-        shadowZY.children[0].remove(shadowZY.children[0].children[1]);
-      }
-    }
-
-    if (
-      Math.abs(pointCurent2.x) > 3 ||
-      Math.abs(pointCurent2.z) > 3 ||
-      pointCurent1.y + 2 > 6
-    ) {
-      this.LBlockS.children[0].children[0].material.color.setHex(wrongColor);
-      this.LBlockS.children[0].children[1].material.color.setHex(wrongColor);
-    }
-
-    TWEEN.removeAll();
-    const current = {
-      opacity: 0.4,
-    };
-    const tween = new TWEEN.Tween(current)
-      .to({ opacity: 0.05 }, 1000)
-      .easing(TWEEN.Easing.Elastic.InOut)
-      .repeat(Infinity)
-      .yoyo(true);
-
-    if (
-      this.LBlockS.children[0].children[1].material.color.getHex() == wrongColor
-    ) {
-      tween.start();
-      tween.onUpdate(() => {
-        this.LBlockS.children[0].children[0].material.opacity = current.opacity;
-        this.LBlockS.children[0].children[1].material.opacity = current.opacity;
-
-        this.LShadowXY.children[0].children[0].material.opacity =
-          current.opacity;
-        if (this.LShadowXY.children[0].children[1] !== undefined) {
-          this.LShadowXY.children[0].children[1].material.opacity =
-            current.opacity;
-        }
-        this.LShadowZY.children[0].children[0].material.opacity =
-          current.opacity;
-        if (this.LShadowZY.children[0].children[1] !== undefined) {
-          this.LShadowZY.children[0].children[1].material.opacity =
-            current.opacity;
-        }
-      });
-    } else {
-      tween.stop();
-    }
-  }
-
-  onDocumentMouseMove(event) {
-    event.preventDefault();
-
-    let pointXY1M = new THREE.Vector3();
-    let pointXY2M = new THREE.Vector3();
-    let pointZY1M = new THREE.Vector3();
-    let pointZY2M = new THREE.Vector3();
-    const rightColor = 0x00a9fe;
-    const wrongColor = 0xff0000;
-
-    //let mouse is mouse position
-    this.mouse.set(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    //create raycaster
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    //have a array to store all objects that been touched by ray
-    const intersects = this.raycaster.intersectObjects(this.allObjects, true);
-    //if have touched, get the first one
-    if (intersects.length > 0) {
-      this.LBlockS.children[0].children[0].material.needsUpdate = true;
-      this.LBlockS.children[0].children[1].material.needsUpdate = true;
-      this.LBlockS.children[0].children[0].material.color.setHex(rightColor);
-      this.LBlockS.children[0].children[1].material.color.setHex(rightColor);
-      //only need to place above plane and the highlight only exist on XZ plane.
-      const intersect = intersects[0];
-      let yValue = intersect.point.y;
-
-      if (yValue < 0) {
-        yValue = 0.3;
-      } else {
-        this.LBlockS.position.copy(intersect.point);
-        this.LBlockS.position.floor().addScalar(0.5);
-        this.LBlockS.updateMatrixWorld();
-        //check valid or not, change color
-        for (let i = 0; i < this.allObjects.length; i++) {
-          if (this.allObjects[i].type == 'Mesh') {
-            //dont test against the plane, other blocks are object3D
-            continue;
-          }
-          if (
-            this.checkCollision(this.LBlockS.children[0], this.allObjects[i])
-          ) {
-            this.LBlockS.children[0].children[0].material.color.setHex(
-              wrongColor
-            );
-            this.LBlockS.children[0].children[1].material.color.setHex(
-              wrongColor
-            );
-          }
-        }
-
-        this.checkShadow(this.LShadowXY, this.LShadowZY);
-
-        const pointCurent1 = new THREE.Vector3();
-        const pointCurent2 = new THREE.Vector3();
-        this.LBlockS.children[0].children[0].getWorldPosition(pointCurent1);
-        this.LBlockS.children[0].children[1].getWorldPosition(pointCurent2);
-
-        pointXY1M.x = pointCurent1.x.toFixed(1);
-        pointXY1M.y = pointCurent1.y;
-        pointXY1M.z = 0;
-        pointXY2M.x = pointCurent2.x.toFixed(1);
-        pointXY2M.y = pointCurent2.y;
-        pointXY2M.z = 0;
-
-        pointZY1M.x = -pointCurent1.z.toFixed(1);
-        pointZY1M.y = pointCurent1.y;
-        pointZY1M.z = 0;
-        pointZY2M.x = -pointCurent2.z.toFixed(1);
-        pointZY2M.y = pointCurent2.y;
-        pointZY2M.z = 0;
-        this.LShadowXY.position.copy(pointXY1M);
-        this.LShadowZY.position.copy(pointZY1M);
-      }
-    }
-  }
-
-  onDocumentMouseDown(event) {
-    event.preventDefault();
-    const wrongColor = 0xff0000;
-    this.LBlockC = new LBlock().addCubeToSpace();
-    this.LBlockC.setRotationFromQuaternion(this.currentRotation);
-    this.LBlockC.updateMatrixWorld();
-
-    this.LShadowCXY = new LBlock().addShadowXY();
-    this.LShadowCZY = new LBlock().addShadowZY();
-    this.LShadowCZY.rotateY(-Math.PI / 2);
-
-    this.mouse.set(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects(this.allObjects, true);
-
-    if (intersects.length > 0) {
-      //only need to place above plane and the highlight only exist on XZ plane.
-      const intersect = intersects[0];
-      let yValue = intersect.point.y;
-
-      if (yValue < 0) {
-        yValue = 0.3;
-      } else {
-        this.LBlockC.position.copy(intersect.point);
-        this.LBlockC.position.floor().addScalar(0.5);
-        this.LBlockC.updateMatrixWorld();
-
-        let pointXY1M = new THREE.Vector3();
-        let pointXY2M = new THREE.Vector3();
-        let pointZY1M = new THREE.Vector3();
-        let pointZY2M = new THREE.Vector3();
-
-        let pointCurent1 = new THREE.Vector3();
-        let pointCurent2 = new THREE.Vector3();
-
-        this.LBlockC.children[0].children[0].getWorldPosition(pointCurent1);
-        this.LBlockC.children[0].children[1].getWorldPosition(pointCurent2);
-        //XY plane shadow trasnform
-        pointXY1M.x = pointCurent1.x.toFixed(1);
-        pointXY1M.y = pointCurent1.y;
-        pointXY1M.z = 0;
-        pointXY2M.x = pointCurent2.x.toFixed(1);
-
-        if (pointXY1M.x == pointXY2M.x) {
-          this.LShadowCXY.children[0].remove(
-            this.LShadowCXY.children[0].children[1]
-          );
-          this.LShadowCXY.position.copy(pointXY1M);
-        } else {
-          this.LShadowCXY.position.copy(pointXY1M);
-          this.LShadowCXY.setRotationFromQuaternion(this.currentRotation);
-          this.LShadowCXY.updateMatrixWorld();
-        }
-        //ZY plane shadow trasnform
-        pointZY1M.x = -pointCurent1.z.toFixed(1);
-        pointZY1M.y = pointCurent1.y;
-        pointZY1M.z = 0;
-        pointZY2M.x = -pointCurent2.z.toFixed(1);
-
-        if (pointZY1M.x == pointZY2M.x) {
-          this.LShadowCZY.children[0].remove(
-            this.LShadowCZY.children[0].children[1]
-          );
-          this.LShadowCZY.position.copy(pointZY1M);
-        } else {
-          this.LShadowCZY.position.copy(pointZY1M);
-          this.LShadowCZY.setRotationFromQuaternion(this.currentRotation);
-          this.LShadowCZY.rotateY(-Math.PI);
-          this.LShadowCZY.updateMatrixWorld();
-        }
-        if (
-          this.LBlockS.children[0].children[0].material.color.getHex() ==
-          wrongColor
-        ) {
-          return;
-        }
-        this.planeXY.add(this.LShadowCXY);
-        this.planeZY.add(this.LShadowCZY);
-        this.planeXZ.add(this.LBlockC);
-        this.allObjects.push(this.LBlockC.children[0]);
-      }
-    }
-  }
-
-  roatetkeyPressed(event) {
-    event.preventDefault();
-
-    const rightColor = 0x00a9fe;
-    const wrongColor = 0xff0000;
-    this.LBlockS.children[0].children[0].material.needsUpdate = true;
-    this.LBlockS.children[0].children[1].material.needsUpdate = true;
-    this.LBlockS.children[0].children[0].material.color.setHex(rightColor);
-    this.LBlockS.children[0].children[1].material.color.setHex(rightColor);
-
-    switch (event.key) {
-      case 'ArrowLeft':
-        this.LBlockS.rotateY(-Math.PI / 2);
-        this.LBlockS.updateMatrixWorld();
-        this.checkShadow(this.LShadowXY, this.LShadowZY);
-        this.LBlockS.getWorldQuaternion(this.currentRotation);
-        //check valid or not, change color
-        for (let i = 0; i < this.allObjects.length; i++) {
-          if (this.allObjects[i].type == 'Mesh') {
-            //dont test against the plane, other blocks are object3D
-            continue;
-          }
-          if (
-            this.checkCollision(this.LBlockS.children[0], this.allObjects[i])
-          ) {
-            this.LBlockS.children[0].children[0].material.color.setHex(
-              wrongColor
-            );
-            this.LBlockS.children[0].children[1].material.color.setHex(
-              wrongColor
-            );
-          }
-        }
-
-        break;
-      case 'ArrowRight':
-        this.LBlockS.rotateY(Math.PI / 2);
-        this.LBlockS.updateMatrixWorld();
-        this.checkShadow(this.LShadowXY, this.LShadowZY);
-        //check valid or not, change color
-        for (let i = 0; i < this.allObjects.length; i++) {
-          if (this.allObjects[i].type == 'Mesh') {
-            //dont test against the plane, other blocks are object3D
-            continue;
-          }
-          if (
-            this.checkCollision(this.LBlockS.children[0], this.allObjects[i])
-          ) {
-            this.LBlockS.children[0].children[0].material.color.setHex(
-              wrongColor
-            );
-            this.LBlockS.children[0].children[1].material.color.setHex(
-              wrongColor
-            );
-          }
-        }
-
-        this.LBlockS.getWorldQuaternion(this.currentRotation);
-
-        break;
-    }
-  }
 
   setupXR() {
     this.renderer.xr.enabled = true;
@@ -581,6 +576,38 @@ class App {
     this.stats.update();
     this.renderer.render(this.scene, this.camera);
     TWEEN.update();
+  }
+
+  _addEventListeners() {
+    document.addEventListener('mousemove', (event) => {
+      event.preventDefault();
+      this._onMouseMoves.forEach((fn) => {
+        fn(event);
+      });
+    });
+
+    document.addEventListener('mousedown', (event) => {
+      event.preventDefault();
+      this.mouse.set(
+        (event.clientX / window.innerWidth) * 2 - 1,
+        -(event.clientY / window.innerHeight) * 2 + 1
+      );
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      TWEEN.removeAll();
+
+      this.initBlocks();
+
+      this._onMouseDowns.forEach((fn) => {
+        fn(event);
+      });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      event.preventDefault();
+      this._onKeyDowns.forEach((fn) => {
+        fn(event);
+      });
+    });
   }
 }
 
