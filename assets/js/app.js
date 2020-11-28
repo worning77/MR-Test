@@ -149,6 +149,7 @@ class App {
     this._onKeyUp = [];
     this.BlocksControls = new Inputs(this);
     this._addEventListeners();
+    this.count = 0;
 
     //** Init flags
     this.LSelected = false;
@@ -170,9 +171,7 @@ class App {
     this.renderer.setAnimationLoop(this.render.bind(this));
   }
 
-  menue(){
-
-  }
+  menue() {}
 
   initScene() {
     this.radius = 0.08;
@@ -240,7 +239,6 @@ class App {
       'https://threejs.org/examples/fonts/helvetiker_regular.typeface.json',
       createTypo
     );
-
   }
 
   levelMove() {
@@ -513,10 +511,14 @@ class App {
     }
   }
 
-  initBlocks() {
+  initBlocks(controller) {
     const blockElements = this.raycaster.intersectObjects(this.BLOCKS, true);
     if (blockElements.length > 0) {
       let selectBlock = blockElements[0];
+      if (this.renderer.xr.isPresenting) {
+        controller.children[0].scale.z = selectBlock.distance;
+      }
+
       //** Init LBLOCK
       if (selectBlock.object.parent == this.BLOCKS[0].children[0]) {
         if (!this.LSelected) {
@@ -622,33 +624,32 @@ class App {
     this.renderer.xr.enabled = true;
     const button = new VRButton(this.renderer);
 
+    const self = this;
+
+    this.controllers = this.buildControllers();
+
     function onSelectStart() {
+      this.children[0].scale.z = 10;
+
       this.userData.selectPressed = true;
-
-
     }
 
     function onSelectEnd() {
+      this.children[0].scale.z = 0;
       this.userData.selectPressed = false;
     }
 
     function onSqueezeStart() {
       this.userData.squeezePressed = true;
-
     }
-
     function onSqueezeEnd() {
       this.userData.squeezePressed = false;
-
     }
-
-    this.controllers = this.buildControllers();
-
     this.controllers.forEach((controller) => {
       controller.addEventListener('selectstart', onSelectStart);
       controller.addEventListener('selectend', onSelectEnd);
-      controller.addEventListener('squeezestart', onSqueezeStart);
-      controller.addEventListener('squeezeend', onSqueezeEnd);
+      //controller.addEventListener('squeezestart', onSqueezeStart);
+      //controller.addEventListener('squeezeend', onSqueezeEnd);
     });
   }
 
@@ -666,7 +667,6 @@ class App {
     //expend to far away
     line.scale.z = 6;
 
-    //read and load controllers based on devices and save it to controllers[]
     const controllers = [];
     for (let i = 0; i <= 1; i++) {
       const controller = this.renderer.xr.getController(i);
@@ -684,6 +684,35 @@ class App {
     return controllers;
   }
 
+  selectController(controller) {
+    if (controller.userData.selectPressed) {
+      controller.children[0].scale.z = 10;
+      this.workingMatrix.identity().extractRotation(controller.matrixWorld);
+      this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      this.raycaster.ray.direction
+        .set(0, 0, -1)
+        .applyMatrix4(this.workingMatrix);
+      TWEEN.removeAll();
+
+      this.initBlocks(controller);
+      controller.userData.selectPressed = false;
+    }
+  }
+  moveController(controller) {
+
+      controller.children[0].scale.z = 10;
+      this.workingMatrix.identity().extractRotation(controller.matrixWorld);
+      this.raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
+      this.raycaster.ray.direction
+        .set(0, 0, -1)
+        .applyMatrix4(this.workingMatrix);
+      this._onMouseMoves.forEach((fn) => {
+        fn(controller);
+      });
+
+
+  }
+
   resize() {
     //resize function
     this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -693,12 +722,13 @@ class App {
 
   render() {
     this.stats.update();
+
     if (this.renderer.xr.isPresenting) {
-
+      const self = this;
       this.controllers.forEach((controller) => {
-        
+        self.selectController(controller);
+        self.moveController(controller);
       });
-
     }
 
     if (this.level === 2) {
@@ -725,6 +755,7 @@ class App {
     this.renderer.render(this.scene, this.camera);
     TWEEN.update();
   }
+
   coordinate(coordX, coordY) {
     this.mouseX = (coordX - this.windowHalfX) * 0.5;
     this.mouseY = (coordY - this.windowHalfY) * 0.5;
@@ -737,8 +768,13 @@ class App {
     document.addEventListener('mousemove', (event) => {
       event.preventDefault();
       if (this.level !== 2) {
+        this.mouse.set(
+          (event.clientX / window.innerWidth) * 2 - 1,
+          -(event.clientY / window.innerHeight) * 2 + 1
+        );
+        this.raycaster.setFromCamera(this.mouse, this.camera);
         this._onMouseMoves.forEach((fn) => {
-          fn(event);
+          fn();
         });
       } else {
         this.onMouseMoveF(event);
@@ -757,7 +793,7 @@ class App {
       this.initBlocks();
 
       this._onMouseDowns.forEach((fn) => {
-        fn(event);
+        fn();
       });
 
       if (this.XYmatched && this.ZYmatched) {

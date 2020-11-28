@@ -5,18 +5,19 @@ import { ZBlock } from './shapes/z-shape.js';
 
 class Inputs {
   constructor(app) {
-    app.onMouseMove((event) => {
+
+    app.onMouseMove((controller) => {
       TWEEN.remove(this.flash);
-      this._onMouseMoveL(event);
-      this._onMouseMoveT(event);
-      this._onMouseMoveZ(event);
+     this.moveL(app, controller);
+     this.moveT(app, controller);
+     this.moveZ(app, controller);
     });
 
-    app.onMouseDown((event) => {
-      this._onMouseDownL(event);
-      this._onMouseDownT(event);
-      this._onMouseDownZ(event);
-      this._onMouseDelete(event);
+    app.onMouseDown(() => {
+      this._onMouseDownL(app);
+      this._onMouseDownT(app);
+      this._onMouseDownZ(app);
+      this._onMouseDelete(app);
     });
 
     app.onKeyDown((event) => {
@@ -437,225 +438,223 @@ class Inputs {
     }
   }
 
-  _onMouseMoveL(event) {
-    let pointXY1M = this.Point.clone();
-    let pointZY1M = this.Point.clone();
-    let pointCurent1 = this.Point.clone();
-    let pointCurent2 = this.Point.clone();
+  moveL(app, controller){
+      let pointXY1M = this.Point.clone();
+      let pointZY1M = this.Point.clone();
+      let pointCurent1 = this.Point.clone();
+      let pointCurent2 = this.Point.clone();
 
-    app.mouse.set(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    //create raycaster
-    app.raycaster.setFromCamera(app.mouse, app.camera);
+      const intersects = app.raycaster.intersectObjects(app.allObjects, true);
+      if (app.LSelected) {
+        if (intersects.length > 0) {
 
-    const intersects = app.raycaster.intersectObjects(app.allObjects, true);
-    if (app.LSelected) {
-      if (intersects.length > 0) {
-        app.LBlockS.children[0].children[0].material.needsUpdate = true;
-        app.LBlockS.children[0].children[0].material.color.setHex(
-          this.LrightColor
-        );
-        app.LBlockS.children[0].children[0].material.opacity = 0.4;
-
-        const intersect = intersects[0];
-        intersect.point.y = Math.floor(Math.abs(intersect.point.y));
-
-        app.LBlockS.position.copy(intersect.point);
-        app.LBlockS.position.floor().addScalar(0.5);
-        app.LBlockS.updateMatrixWorld();
-        //check valid or not, change color
-        for (let i = 0; i < app.allObjects.length; i++) {
-          if (app.allObjects[i].name == 'plane') {
-            continue;
-          }
-          if (this.checkCollision(app.LBlockS.children[0], app.allObjects[i])) {
-            app.LBlockS.children[0].children[0].material.color.setHex(
-              this.wrongColor
-            );
-            app.LBlockS.children[0].children[1].material.color.setHex(
-              this.wrongColor
-            );
-          }
-        }
-        this.checkShadowL(app.LShadowXY, app.LShadowZY);
-
-        app.LBlockS.children[0].children[0].getWorldPosition(pointCurent1);
-        app.LBlockS.children[0].children[1].getWorldPosition(pointCurent2);
-        pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
-        pointXY1M.y = pointCurent1.y;
-        pointXY1M.z = 0;
-
-        pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
-        pointZY1M.y = pointCurent1.y;
-        pointZY1M.z = 0;
-
-        app.LShadowXY.position.copy(pointXY1M);
-        app.LShadowZY.position.copy(pointZY1M);
-      }
-    }
-  }
-
-  _onMouseMoveT(event) {
-    let pointXY1M = this.Point.clone();
-    let pointZY1M = this.Point.clone();
-    let pointCurent1 = this.Point.clone();
-    let pointCurent2 = this.Point.clone();
-
-    app.mouse.set(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-    //create raycaster
-    app.raycaster.setFromCamera(app.mouse, app.camera);
-    const intersects = app.raycaster.intersectObjects(app.allObjects, true);
-    if (app.TSelected) {
-      if (intersects.length > 0) {
-        app.TBlockS.children[0].children[0].material.needsUpdate = true;
-        app.TBlockS.children[0].children[0].material.color.setHex(
-          this.TrightColor
-        );
-        app.TBlockS.children[0].children[0].material.opacity = 0.4;
-
-        app.TBlockS.children[0].children[0].getWorldPosition(pointCurent1);
-        app.TBlockS.children[0].children[1].getWorldPosition(pointCurent2);
-
-        const intersect = intersects[0];
-        intersect.point.y = Math.floor(Math.abs(intersect.point.y));
-        if (
-          parseFloat(pointCurent1.y.toFixed(1)) >
-          parseFloat(pointCurent2.y.toFixed(1))
-        ) {
-          app.TBlockS.position.set(
-            intersect.point.x,
-            intersect.point.y + 1,
-            intersect.point.z
+          app.LBlockS.children[0].children[0].material.needsUpdate = true;
+          app.LBlockS.children[0].children[0].material.color.setHex(
+            this.LrightColor
           );
-        } else {
-          app.TBlockS.position.copy(intersect.point);
-        }
-        app.TBlockS.position.floor().addScalar(0.5);
-        app.TBlockS.updateMatrixWorld();
+          app.LBlockS.children[0].children[0].material.opacity = 0.4;
 
-        for (let i = 0; i < app.allObjects.length; i++) {
-          if (app.allObjects[i].name == 'plane') {
-            continue;
+          const intersect = intersects[0];
+          intersect.point.y = Math.floor(Math.abs(intersect.point.y));
+          if (app.renderer.xr.isPresenting) {
+            controller.children[0].scale.z = intersect.distance;
           }
-          if (this.checkCollision(app.TBlockS.children[0], app.allObjects[i])) {
-            app.TBlockS.children[0].children[0].material.color.setHex(
-              this.wrongColor
-            );
-            app.TBlockS.children[0].children[1].material.color.setHex(
-              this.wrongColor
-            );
+
+          app.LBlockS.position.copy(intersect.point);
+          app.LBlockS.position.floor().addScalar(0.5);
+          app.LBlockS.updateMatrixWorld();
+          //check valid or not, change color
+          for (let i = 0; i < app.allObjects.length; i++) {
+            if (app.allObjects[i].name == 'plane') {
+              continue;
+            }
+            if (
+              this.checkCollision(app.LBlockS.children[0], app.allObjects[i])
+            ) {
+              app.LBlockS.children[0].children[0].material.color.setHex(
+                this.wrongColor
+              );
+              app.LBlockS.children[0].children[1].material.color.setHex(
+                this.wrongColor
+              );
+            }
           }
+          this.checkShadowL(app.LShadowXY, app.LShadowZY);
+
+          app.LBlockS.children[0].children[0].getWorldPosition(pointCurent1);
+          app.LBlockS.children[0].children[1].getWorldPosition(pointCurent2);
+          pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
+          pointXY1M.y = pointCurent1.y;
+          pointXY1M.z = 0;
+
+          pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
+          pointZY1M.y = pointCurent1.y;
+          pointZY1M.z = 0;
+
+          app.LShadowXY.position.copy(pointXY1M);
+          app.LShadowZY.position.copy(pointZY1M);
         }
-        this.checkShadowT(app.TShadowXY, app.TShadowZY);
-
-        pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
-        pointXY1M.y = pointCurent1.y - 3;
-        pointXY1M.z = 0;
-
-        pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
-        pointZY1M.y = pointCurent1.y;
-        pointZY1M.z = 0;
-
-        app.TShadowXY.position.copy(pointXY1M);
-        app.TShadowZY.position.copy(pointZY1M);
       }
-    }
+
   }
-
-  _onMouseMoveZ(event) {
-    let pointXY1M = this.Point.clone();
-    let pointZY1M = this.Point.clone();
-    let pointCurent1 = this.Point.clone();
-    let pointCurent2 = this.Point.clone();
-    app.mouse.set(
-      (event.clientX / window.innerWidth) * 2 - 1,
-      -(event.clientY / window.innerHeight) * 2 + 1
-    );
-
-    app.raycaster.setFromCamera(app.mouse, app.camera);
-    const intersects = app.raycaster.intersectObjects(app.allObjects, true);
-
-    if (app.ZSelected) {
-      if (intersects.length > 0) {
-        app.ZBlockS.children[0].children[0].material.needsUpdate = true;
-        app.ZBlockS.children[0].children[0].material.color.setHex(
-          this.ZrightColor
-        );
-        app.ZBlockS.children[0].children[0].material.opacity = 0.4;
-
-        app.ZBlockS.children[0].children[0].getWorldPosition(pointCurent1);
-        app.ZBlockS.children[0].children[1].getWorldPosition(pointCurent2);
-
-        const intersect = intersects[0];
-        intersect.point.y = Math.floor(Math.abs(intersect.point.y));
-        if (
-          parseFloat(pointCurent1.y.toFixed(1)) <
-          parseFloat(pointCurent2.y.toFixed(1))
-        ) {
-          app.ZBlockS.position.set(
-            intersect.point.x,
-            intersect.point.y + 1,
-            intersect.point.z
+  moveT(app,controller){
+      let pointXY1M = this.Point.clone();
+      let pointZY1M = this.Point.clone();
+      let pointCurent1 = this.Point.clone();
+      let pointCurent2 = this.Point.clone();
+      const intersects = app.raycaster.intersectObjects(app.allObjects, true);
+      if (app.TSelected) {
+        if (intersects.length > 0) {
+          app.TBlockS.children[0].children[0].material.needsUpdate = true;
+          app.TBlockS.children[0].children[0].material.color.setHex(
+            this.TrightColor
           );
-        } else if (
-          parseFloat(pointCurent1.y.toFixed(1)) >
-          parseFloat(pointCurent2.y.toFixed(1))
-        ) {
-          if (intersect.point.y > 0) {
-            app.ZBlockS.position.copy(intersect.point);
-          } else if (intersect.point.y == 0) {
+          app.TBlockS.children[0].children[0].material.opacity = 0.4;
+
+          app.TBlockS.children[0].children[0].getWorldPosition(pointCurent1);
+          app.TBlockS.children[0].children[1].getWorldPosition(pointCurent2);
+
+          const intersect = intersects[0];
+          intersect.point.y = Math.floor(Math.abs(intersect.point.y));
+           if (app.renderer.xr.isPresenting) {
+             controller.children[0].scale.z = intersect.distance;
+           }
+          if (
+            parseFloat(pointCurent1.y.toFixed(1)) >
+            parseFloat(pointCurent2.y.toFixed(1))
+          ) {
+            app.TBlockS.position.set(
+              intersect.point.x,
+              intersect.point.y + 1,
+              intersect.point.z
+            );
+          } else {
+            app.TBlockS.position.copy(intersect.point);
+          }
+          app.TBlockS.position.floor().addScalar(0.5);
+          app.TBlockS.updateMatrixWorld();
+
+          for (let i = 0; i < app.allObjects.length; i++) {
+            if (app.allObjects[i].name == 'plane') {
+              continue;
+            }
+            if (
+              this.checkCollision(app.TBlockS.children[0], app.allObjects[i])
+            ) {
+              app.TBlockS.children[0].children[0].material.color.setHex(
+                this.wrongColor
+              );
+              app.TBlockS.children[0].children[1].material.color.setHex(
+                this.wrongColor
+              );
+            }
+          }
+          this.checkShadowT(app.TShadowXY, app.TShadowZY);
+
+          pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
+          pointXY1M.y = pointCurent1.y - 3;
+          pointXY1M.z = 0;
+
+          pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
+          pointZY1M.y = pointCurent1.y;
+          pointZY1M.z = 0;
+
+          app.TShadowXY.position.copy(pointXY1M);
+          app.TShadowZY.position.copy(pointZY1M);
+        }
+      }
+
+  }
+  moveZ(app,controller){
+      let pointXY1M = this.Point.clone();
+      let pointZY1M = this.Point.clone();
+      let pointCurent1 = this.Point.clone();
+      let pointCurent2 = this.Point.clone();
+
+      const intersects = app.raycaster.intersectObjects(app.allObjects, true);
+
+      if (app.ZSelected) {
+        if (intersects.length > 0) {
+          app.ZBlockS.children[0].children[0].material.needsUpdate = true;
+          app.ZBlockS.children[0].children[0].material.color.setHex(
+            this.ZrightColor
+          );
+          app.ZBlockS.children[0].children[0].material.opacity = 0.4;
+
+          app.ZBlockS.children[0].children[0].getWorldPosition(pointCurent1);
+          app.ZBlockS.children[0].children[1].getWorldPosition(pointCurent2);
+
+          const intersect = intersects[0];
+          intersect.point.y = Math.floor(Math.abs(intersect.point.y));
+           if (app.renderer.xr.isPresenting) {
+             controller.children[0].scale.z = intersect.distance;
+           }
+          if (
+            parseFloat(pointCurent1.y.toFixed(1)) <
+            parseFloat(pointCurent2.y.toFixed(1))
+          ) {
             app.ZBlockS.position.set(
               intersect.point.x,
               intersect.point.y + 1,
               intersect.point.z
             );
+          } else if (
+            parseFloat(pointCurent1.y.toFixed(1)) >
+            parseFloat(pointCurent2.y.toFixed(1))
+          ) {
+            if (intersect.point.y > 0) {
+              app.ZBlockS.position.copy(intersect.point);
+            } else if (intersect.point.y == 0) {
+              app.ZBlockS.position.set(
+                intersect.point.x,
+                intersect.point.y + 1,
+                intersect.point.z
+              );
+            }
+          } else if (
+            parseFloat(pointCurent1.y.toFixed(1)) ==
+            parseFloat(pointCurent2.y.toFixed(1))
+          ) {
+            app.ZBlockS.position.copy(intersect.point);
           }
-        } else if (
-          parseFloat(pointCurent1.y.toFixed(1)) ==
-          parseFloat(pointCurent2.y.toFixed(1))
-        ) {
-          app.ZBlockS.position.copy(intersect.point);
+          app.ZBlockS.position.floor().addScalar(0.5);
+          app.ZBlockS.updateMatrixWorld();
+
+          for (let i = 0; i < app.allObjects.length; i++) {
+            if (app.allObjects[i].name == 'plane') {
+              continue;
+            }
+            if (
+              this.checkCollision(app.ZBlockS.children[0], app.allObjects[i])
+            ) {
+              app.ZBlockS.children[0].children[0].material.color.setHex(
+                this.wrongColor
+              );
+              app.ZBlockS.children[0].children[1].material.color.setHex(
+                this.wrongColor
+              );
+            }
+          }
+
+          this.checkShadowZ(app.ZShadowXY, app.ZShadowZY);
+
+          pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
+          pointXY1M.y = pointCurent1.y - 3;
+          pointXY1M.z = 0;
+
+          pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
+          pointZY1M.y = pointCurent1.y - 3;
+          pointZY1M.z = 0;
+
+          app.ZShadowXY.position.copy(pointXY1M);
+          app.ZShadowZY.position.copy(pointZY1M);
         }
-        app.ZBlockS.position.floor().addScalar(0.5);
-        app.ZBlockS.updateMatrixWorld();
-
-        for (let i = 0; i < app.allObjects.length; i++) {
-          if (app.allObjects[i].name == 'plane') {
-            continue;
-          }
-          if (this.checkCollision(app.ZBlockS.children[0], app.allObjects[i])) {
-            app.ZBlockS.children[0].children[0].material.color.setHex(
-              this.wrongColor
-            );
-            app.ZBlockS.children[0].children[1].material.color.setHex(
-              this.wrongColor
-            );
-          }
-        }
-
-        this.checkShadowZ(app.ZShadowXY, app.ZShadowZY);
-
-        pointXY1M.x = parseFloat(pointCurent1.x.toFixed(1));
-        pointXY1M.y = pointCurent1.y - 3;
-        pointXY1M.z = 0;
-
-        pointZY1M.x = parseFloat(-pointCurent1.z.toFixed(1));
-        pointZY1M.y = pointCurent1.y - 3;
-        pointZY1M.z = 0;
-
-        app.ZShadowXY.position.copy(pointXY1M);
-        app.ZShadowZY.position.copy(pointZY1M);
       }
-    }
+
   }
 
-  _onMouseDownL(event) {
-    event.preventDefault();
+  _onMouseDownL(app, controller) {
+
     let pointXY1M = this.Point.clone();
     let pointXY2M = this.Point.clone();
     let pointZY1M = this.Point.clone();
@@ -804,8 +803,8 @@ class Inputs {
     }
   }
 
-  _onMouseDownT(event) {
-    event.preventDefault();
+  _onMouseDownT(app, controller) {
+
     let pointXY1M = this.Point.clone();
     let pointXY2M = this.Point.clone();
     let pointZY1M = this.Point.clone();
@@ -967,8 +966,8 @@ class Inputs {
     }
   }
 
-  _onMouseDownZ(event) {
-    event.preventDefault();
+  _onMouseDownZ(app, controller) {
+
     let pointXY1M = this.Point.clone();
     let pointXY2M = this.Point.clone();
     let pointZY1M = this.Point.clone();
@@ -1323,8 +1322,8 @@ class Inputs {
       }
     }
   }
-  _onMouseDelete(event) {
-    event.preventDefault();
+  _onMouseDelete(app, controller) {
+
     this.empty = new THREE.Mesh();
     this.empty.position.set(0, -0.5, 0);
     this.empty.scale.set(0, 0, 0);
