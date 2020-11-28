@@ -130,6 +130,7 @@ class LBlock {
       color: this.color,
       roughness: 0.7,
       metalness: 0.0,
+      opacity: 1,
     });
 
     let i = 0;

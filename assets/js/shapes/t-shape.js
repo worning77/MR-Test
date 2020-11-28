@@ -134,7 +134,7 @@ class TBlock {
     const cubeGeometry = new THREE.BoxBufferGeometry(1, 1, 1);
     const cubeMaterial = new THREE.MeshStandardMaterial({
       color: this.color,
-      opacity: 1,
+      //opacity: 1,
       roughness: 1,
       metalness: 0.0,
     });

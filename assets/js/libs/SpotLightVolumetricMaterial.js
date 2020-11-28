@@ -1,10 +1,14 @@
 //Based on https://github.com/jeromeetienne/threex.volumetricspotlight
 import { Color, Vector3, ShaderMaterial } from './three/three.module.js';
 
-class SpotLightVolumetricMaterial extends ShaderMaterial{
-	constructor( color = new Color(0xFFFFFF), position = new Vector3() , attenuation = 5.0, anglePower = 1.2){
-        
-        const vertexShader = `
+class SpotLightVolumetricMaterial extends ShaderMaterial {
+  constructor(
+    color = new Color(0xffffff),
+    position = new Vector3(),
+    attenuation = 5.0,
+    anglePower = 2
+  ) {
+    const vertexShader = `
             varying vec3 vNormal;
             varying vec3 vWorldPosition;
 
@@ -18,8 +22,8 @@ class SpotLightVolumetricMaterial extends ShaderMaterial{
                 // set gl_Position
                 gl_Position	= projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
             }`;
-	
-	const fragmentShader = `
+
+    const fragmentShader = `
 		varying vec3		vNormal;
 		varying vec3		vWorldPosition;
 
@@ -37,14 +41,14 @@ class SpotLightVolumetricMaterial extends ShaderMaterial{
 			// distance attenuation					//
 			//////////////////////////////////////////////////////////
 			intensity	= distance(vWorldPosition, spotPosition)/attenuation;
-			intensity	= 1.0 - clamp(intensity, 0.0, 1.0);
+			intensity	= 2.0 - clamp(intensity, 0.0, 3.0);
 
 			//////////////////////////////////////////////////////////
 			// intensity on angle					//
 			//////////////////////////////////////////////////////////
 			vec3 normal	= vec3(vNormal.x, vNormal.y, abs(vNormal.z));
 			float angleIntensity	= pow( dot(normal, vec3(0.0, 0.0, 1.0)), anglePower );
-			intensity	= intensity * angleIntensity;		
+			intensity	= intensity * angleIntensity;
 
 			//////////////////////////////////////////////////////////
 			// final color						//
@@ -53,31 +57,31 @@ class SpotLightVolumetricMaterial extends ShaderMaterial{
 			// set the final color
 			gl_FragColor	= vec4( lightColor, intensity);
 		}`;
-	
-        const parameters = {
-            uniforms : { 
-                attenuation	: {
-                    value	: attenuation
-                },
-                anglePower	: {
-                    value	: anglePower
-                },
-                spotPosition : {
-                    value	: position
-                },
-                lightColor	: {
-                    value	: color
-                }
-            },
-            vertexShader : vertexShader,
-            fragmentShader : fragmentShader,
-            transparent	: true,
-            depthWrite : false
-        };
-        
-        super( parameters );
-        
-    }
+
+    const parameters = {
+      uniforms: {
+        attenuation: {
+          value: attenuation,
+        },
+        anglePower: {
+          value: anglePower,
+        },
+        spotPosition: {
+          value: position,
+        },
+        lightColor: {
+          value: color,
+        },
+      },
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      transparent: true,
+
+      depthWrite: false,
+    };
+
+    super(parameters);
+  }
 }
 
 export { SpotLightVolumetricMaterial };

@@ -195,6 +195,7 @@ class ZBlock {
     this.zBlock.add(this.zBlockPart1, this.zBlockPart2);
     this.zBlock.updateWorldMatrix;
     this.zPivot.add(this.zBlock);
+    this.zPivot.layers.enable(1);
     return this.zPivot;
   }
 
